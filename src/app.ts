@@ -22,34 +22,50 @@ if (!token || !channelId) {
 
 // Discordクライアントを作成
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.DirectMessages,
+  ],
 });
 
 // Botが準備完了したときに実行
 client.once("ready", () => {
   console.log(`Bot is online! Logged in as ${client.user?.tag}`);
+});
 
-  // 任意のサーバーとチャンネルIDを設定してボタン付きメッセージを送信
-  const messageContent = "以下のボタンを押してください。";
+// メッセージをリッスンして、特定のコマンドを処理
+client.on("messageCreate", async (message) => {
+  // Bot自身のメッセージは無視
+  if (message.author.bot) return;
 
-  const channel = client.channels.cache.get(channelId);
-  if (channel instanceof TextChannel) {
-    // ボタンを作成
-    const button = new ButtonBuilder()
-      .setCustomId("confirm_button")
-      .setLabel("確認")
-      .setStyle(ButtonStyle.Primary);
+  // "!sendButton" コマンドをチェック
+  if (message.content === "!sendButton") {
+    console.log(`Received command: ${message.content}`);
 
-    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(button);
+    // 任意のサーバーとチャンネルIDを設定してボタン付きメッセージを送信
+    const messageContent = "以下のボタンを押してください。";
 
-    // メッセージとボタンを送信
-    channel
-      .send({ content: messageContent, components: [row] })
-      .catch(console.error);
-  } else {
-    console.error(
-      "指定されたチャンネルが見つからないか、テキストチャンネルではありません。"
-    );
+    const channel = client.channels.cache.get(channelId);
+    if (channel instanceof TextChannel) {
+      // ボタンを作成
+      const button = new ButtonBuilder()
+        .setCustomId("confirm_button")
+        .setLabel("確認")
+        .setStyle(ButtonStyle.Primary);
+
+      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(button);
+
+      // メッセージとボタンを送信
+      await channel
+        .send({ content: messageContent, components: [row] })
+        .catch(console.error);
+    } else {
+      console.error(
+        "指定されたチャンネルが見つからないか、テキストチャンネルではありません。"
+      );
+    }
   }
 });
 
@@ -59,13 +75,26 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 
   if (interaction.customId === "confirm_button") {
     try {
+      // ボタンがクリックされたことを通知
       await interaction.reply({
         content: "ボタンが押されました！",
         ephemeral: true,
       });
-      console.log("ボタンがクリックされ、応答しました。");
+
+      // ユーザーにDMを送信
+      const user = interaction.user;
+      await user.send(
+        "確認ありがとうございます！このメッセージはDMで送信されました。"
+      );
+      console.log(`DMを送信しました: ${user.tag}`);
     } catch (error) {
       console.error("インタラクションの処理中にエラーが発生しました:", error);
+
+      // エラーが発生した場合、ユーザーにエラーメッセージを通知
+      await interaction.reply({
+        content: "DMの送信に失敗しました。",
+        ephemeral: true,
+      });
     }
   }
 });
